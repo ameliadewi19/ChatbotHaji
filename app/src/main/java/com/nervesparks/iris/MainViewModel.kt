@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.chaquo.python.PyObject
 import com.nervesparks.iris.data.UserPreferencesRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,16 @@ import kotlinx.coroutines.flow.catch
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+
+import java.io.*
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+
+import com.chaquo.python.PyException;
+import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
 
 class MainViewModel(private val llamaAndroid: LLamaAndroid = LLamaAndroid.instance(), private val userPreferencesRepository: UserPreferencesRepository): ViewModel() {
     companion object {
@@ -252,53 +263,53 @@ class MainViewModel(private val llamaAndroid: LLamaAndroid = LLamaAndroid.instan
         }
     }
 
-    fun send() {
-        val userMessage = removeExtraWhiteSpaces(message)
-        message = ""
-
-        // Add to messages console.
-        if (userMessage != "" && userMessage != " ") {
-            if(first){
-                addMessage("system", "This is a conversation between User and Iris, a friendly chatbot. Iris is helpful, kind, honest, good at writing, and never fails to answer any requests immediately and with precision.")
-                addMessage("user", "Hi")
-                addMessage("assistant", "How may I help You?")
-                first = false
-            }
-
-            addMessage("user", userMessage)
-
-
-            viewModelScope.launch {
-                try {
-                    llamaAndroid.send(llamaAndroid.getTemplate(messages))
-                        .catch {
-                            Log.e(tag, "send() failed", it)
-                            addMessage("error", it.message ?: "")
-                        }
-                        .collect { response ->
-                            // Create a new assistant message with the response
-                            if (getIsMarked()) {
-                                addMessage("codeBlock", response)
-
-                            } else {
-                                addMessage("assistant", response)
-                            }
-                        }
-                }
-                finally {
-                    if (!getIsCompleteEOT()) {
-                        trimEOT()
-                    }
-                }
-
-
-
-            }
-        }
-
-
-
-    }
+//    fun send() {
+//        val userMessage = removeExtraWhiteSpaces(message)
+//        message = ""
+//
+//        // Add to messages console.
+//        if (userMessage != "" && userMessage != " ") {
+//            if(first){
+//                addMessage("system", "This is a conversation between User and Iris, a friendly chatbot. Iris is helpful, kind, honest, good at writing, and never fails to answer any requests immediately and with precision.")
+//                addMessage("user", "Hi")
+//                addMessage("assistant", "How may I help You?")
+//                first = false
+//            }
+//
+//            addMessage("user", userMessage)
+//
+//
+//            viewModelScope.launch {
+//                try {
+//                    llamaAndroid.send(llamaAndroid.getTemplate(messages))
+//                        .catch {
+//                            Log.e(tag, "send() failed", it)
+//                            addMessage("error", it.message ?: "")
+//                        }
+//                        .collect { response ->
+//                            // Create a new assistant message with the response
+//                            if (getIsMarked()) {
+//                                addMessage("codeBlock", response)
+//
+//                            } else {
+//                                addMessage("assistant", response)
+//                            }
+//                        }
+//                }
+//                finally {
+//                    if (!getIsCompleteEOT()) {
+//                        trimEOT()
+//                    }
+//                }
+//
+//
+//
+//            }
+//        }
+//
+//
+//
+//    }
 
 //    fun bench(pp: Int, tg: Int, pl: Int, nr: Int = 1) {
 //        viewModelScope.launch {
@@ -324,6 +335,112 @@ class MainViewModel(private val llamaAndroid: LLamaAndroid = LLamaAndroid.instan
 //            }
 //        }
 //    }
+
+    // Fungsi untuk mendapatkan BM25 scores dari Python
+    fun getBM25ScoresFromPython(query: String): List<String> {
+        return try {
+            val py = Python.getInstance()
+            val bm25Module = py.getModule("bm25_script")  // Nama script Python yang berisi fungsi get_bm25_scores
+
+            // Panggil fungsi Python yang mengembalikan dokumen teratas berdasarkan BM25
+            val result = bm25Module.callAttr("get_bm25_scores", query)
+
+            // Hasil yang dikembalikan berupa list dokumen teratas
+            val topDocs = result.asList().map { it.toString() }
+
+            // Logging untuk memverifikasi hasil
+            Log.d("BM25_RESULT", "Top Documents: $topDocs")
+
+            // Kembalikan daftar dokumen teratas
+            topDocs
+        } catch (e: Exception) {
+            Log.e("BM25_ERROR", "Python call failed", e)
+            emptyList()  // Jika terjadi error, kembalikan daftar kosong
+        }
+    }
+
+    fun getHajjRequirementsFromPython(): String {
+        return try {
+            // Ambil Python instance
+            val py = Python.getInstance()
+
+            // Ambil modul Python yang berisi fungsi get_hajj_requirements
+            val hajjModule = py.getModule("bm25_script")
+
+            // Panggil fungsi Python get_hajj_requirements yang mengembalikan kalimat syarat haji
+            val result = hajjModule.callAttr("get_hajj_requirements")
+            Log.e("Hasil", result.toString())
+
+            // Ambil hasilnya sebagai string
+            result.toString()
+
+        } catch (e: Exception) {
+            // Tangani error jika ada masalah dalam pemanggilan Python
+            Log.e("Hajj_ERROR", "Python call failed", e)
+            "Terjadi kesalahan saat mengambil syarat haji."
+        }
+    }
+
+    // Fungsi untuk mengirim pesan
+    // Fungsi untuk mengirim pesan
+    fun send() {
+        val userMessage = removeExtraWhiteSpaces(message)
+        message = ""
+
+        // Add to messages console.
+        if (userMessage != "" && userMessage != " ") {
+            if (first) {
+                addMessage("system", "This is a conversation between User and Iris, a friendly chatbot. Iris is helpful, kind, honest, good at writing, and never fails to answer any requests immediately and with precision.")
+                addMessage("user", "Hi")
+                addMessage("assistant", "How may I help You?")
+                first = false
+            }
+
+            addMessage("user", userMessage)
+
+            // Ambil konteks relevan menggunakan retrieval
+            val relevantContext = getBM25ScoresFromPython(userMessage)
+
+            // Format konteks RAG-style dengan 3 dokumen teratas
+            val formattedContext = relevantContext.joinToString("\n") { doc ->
+                "Context: $doc"
+            }
+
+            // Gabungkan dengan pesan sebelumnya
+            val messageWithContext = listOf(
+                mapOf("role" to "system", "content" to "Berikut konteks relevan:\n$formattedContext")
+            )
+
+            val fullMessages: List<Map<String, String>> = messages + messageWithContext
+
+            fullMessages.forEachIndexed { index, msg ->
+                Log.d("ChatDebug", "Message[$index]: role=${msg["role"]}, content=${msg["content"]}")
+            }
+
+            viewModelScope.launch {
+                try {
+                    // Kirim pesan gabungan ke llamaAndroid (model)
+                    llamaAndroid.send(llamaAndroid.getTemplate(fullMessages))  // Gabungkan dengan pesan sebelumnya
+                        .catch {
+                            Log.e(tag, "send() failed", it)
+                            addMessage("error", it.message ?: "")
+                        }
+                        .collect { response ->
+                            // Create a new assistant message with the response
+                            if (getIsMarked()) {
+                                addMessage("codeBlock", response)
+                            } else {
+                                addMessage("assistant", response)
+                            }
+                        }
+                } finally {
+                    if (!getIsCompleteEOT()) {
+                        trimEOT()
+                    }
+                }
+            }
+        }
+    }
 
     suspend fun unload(){
         llamaAndroid.unload()

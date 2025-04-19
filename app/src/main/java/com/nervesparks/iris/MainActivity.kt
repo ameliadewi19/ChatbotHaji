@@ -65,6 +65,9 @@ import androidx.lifecycle.ViewModelProvider
 import com.nervesparks.iris.data.UserPreferencesRepository
 import com.nervesparks.iris.ui.SettingsBottomSheet
 
+import com.chaquo.python.PyException
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 
 class MainViewModelFactory(
     private val llamaAndroid: LLamaAndroid,
@@ -116,6 +119,11 @@ class MainActivity(
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (! Python.isStarted()) {
+            Python.start(AndroidPlatform(this))
+        }
+        val py = Python.getInstance()
+
         window.statusBarColor = android.graphics.Color.parseColor("#FF070915")//for status bar color
 
         StrictMode.setVmPolicy(

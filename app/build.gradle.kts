@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.chaquo.python")
 }
 
 android {
@@ -22,8 +23,9 @@ android {
         }
         ndk {
             // Add NDK properties if wanted, e.g.
-            // abiFilters += listOf("arm64-v8a")
+             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
+
     }
 
     buildTypes {
@@ -84,6 +86,9 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.5")
     implementation("androidx.compose.foundation:foundation-layout-android:1.7.6")
     implementation("androidx.games:games-activity:3.0.5")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.4")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.13.4")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
@@ -94,7 +99,25 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-
-
-
 }
+
+chaquopy {
+    defaultConfig {
+        version = "3.11"
+        buildPython("C:/Users/ameli/AppData/Local/Programs/Python/Python311/python.exe")
+        pip {
+            // "-r"` followed by a requirements filename, relative to the
+            // project directory:
+            install("-r", "requirements.txt")
+        }
+    }
+}
+
+chaquopy {
+    sourceSets {
+        getByName("main") {
+            srcDir("src/main/python")
+        }
+    }
+}
+

@@ -1,0 +1,3 @@
+# app/requirements.txt
+rank_bm25
+numpy
